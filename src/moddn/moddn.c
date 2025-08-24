@@ -52,7 +52,7 @@ void moddn_entry()
     SetConsoleTitleA("Moddn Console");
 #endif
 
-    ptr_load("moddn/configs/pointers.json", g_pointers, MAX_PTRS);
+    g_pointer_count = ptr_load("moddn/config/pointers.json", g_pointers, MAX_PTRS);
     load_mods("moddn/mods");
 
     while (1) 

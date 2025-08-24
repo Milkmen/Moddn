@@ -60,10 +60,25 @@ void mod_call(lua_mod_t* mod, const char *func)
     }
 }
 
+static pointer_t* ptr_find_by_name(const char* name)
+{
+    extern pointer_t g_pointers[];
+    extern int g_pointer_count;
+
+    for (int i = 0; i < g_pointer_count; ++i)
+    {
+        if (strcmp(g_pointers[i].name, name) == 0)
+        {
+            return &g_pointers[i];
+        }
+    }
+    return NULL;
+}
+
 static int lua_pointer_get(lua_State* L)
 {
     const char* name = luaL_checkstring(L, 1);
-    double value = ptr_get(name);
+    double value = ptr_get(ptr_find_by_name(name));
     lua_pushnumber(L, value);
     return 1;
 }
@@ -72,7 +87,7 @@ static int lua_pointer_set(lua_State* L)
 {
     const char* name = luaL_checkstring(L, 1);
     double value = luaL_checknumber(L, 2);
-    ptr_set(name, value);
+    ptr_set(ptr_find_by_name(name), value);
     return 0;
 }
 

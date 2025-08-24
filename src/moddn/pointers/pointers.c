@@ -5,6 +5,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+#include <direct.h>
+#define getcwd _getcwd
+#else
+#include <unistd.h>
+#endif
+
 #include <cJSON.h>
 
 static uint8_t parse_type(const char* type_str)
@@ -25,25 +32,62 @@ static uint8_t parse_type(const char* type_str)
 int ptr_load(const char* filename, pointer_t* out, int max_pointers)
 {
     FILE* f = fopen(filename, "rb");
-    if (!f) return -1;
+    if (!f) {
+        printf("ERROR: Cannot open file '%s'\n", filename);
+        printf("Current working directory: ");
+        char cwd[1024];
+        if (getcwd(cwd, sizeof(cwd)) != NULL) {
+            printf("%s\n", cwd);
+        }
+        else {
+            printf("Unable to get current directory\n");
+        }
+        return -1;
+    }
 
     fseek(f, 0, SEEK_END);
     long len = ftell(f);
+
+    if (len <= 0) {
+        printf("ERROR: File is empty or invalid size\n");
+        fclose(f);
+        return -1;
+    }
+
     fseek(f, 0, SEEK_SET);
 
     char* data = malloc(len + 1);
-    if (!data) { fclose(f); return -2; }
+    if (!data) {
+        printf("ERROR: Memory allocation failed\n");
+        fclose(f);
+        return -2;
+    }
 
-    fread(data, 1, len, f);
+    size_t read_bytes = fread(data, 1, len, f);
+
     data[len] = '\0';
     fclose(f);
 
     cJSON* root = cJSON_Parse(data);
-    free(data);
-    if (!root) return -3;
+    if (!root) {
+        printf("ERROR: JSON parsing failed\n");
+        const char* error_ptr = cJSON_GetErrorPtr();
+        if (error_ptr != NULL) {
+            printf("JSON Error before: %.20s\n", error_ptr);
+        }
+        free(data);
+        return -3;
+    }
 
     int count = 0;
     cJSON* child = root->child;
+
+    if (!child) {
+        printf("ERROR: No child elements found in JSON\n");
+        cJSON_Delete(root);
+        free(data);
+        return 0;
+    }
 
     while (child && count < max_pointers)
     {
@@ -54,10 +98,13 @@ int ptr_load(const char* filename, pointer_t* out, int max_pointers)
         if (child->string)
         {
             size_t len = strlen(child->string);
-            if (len < NAME_MAX_LEN) {
-                strcpy(ptr->name, child->string);  // Use strcpy instead of strncpy
+
+            if (len < NAME_MAX_LEN) 
+            {
+                strcpy(ptr->name, child->string);
             }
-            else {
+            else 
+            {
                 strncpy(ptr->name, child->string, NAME_MAX_LEN - 1);
                 ptr->name[NAME_MAX_LEN - 1] = '\0';
             }
@@ -68,46 +115,77 @@ int ptr_load(const char* filename, pointer_t* out, int max_pointers)
         cJSON* base = cJSON_GetObjectItem(child, "base");
         cJSON* offsets = cJSON_GetObjectItem(child, "offsets");
 
-        if (!type || !module || !base || !offsets) {
+        if (!type || !module || !base || !offsets) 
+        {
+            printf("WARNING: Missing required fields, skipping this item\n");
+            if (!type) printf("  Missing 'type'\n");
+            if (!module) printf("  Missing 'module'\n");
+            if (!base) printf("  Missing 'base'\n");
+            if (!offsets) printf("  Missing 'offsets'\n");
             child = child->next;
             continue;
         }
 
         // Parse type
-        if (cJSON_IsString(type) && type->valuestring) {
+        if (cJSON_IsString(type) && type->valuestring) 
+        {
             ptr->type = parse_type(type->valuestring);
         }
 
         // Parse module
-        if (cJSON_IsString(module) && module->valuestring) {
+        if (cJSON_IsString(module) && module->valuestring) 
+        {
             size_t len = strlen(module->valuestring);
-            if (len < NAME_MAX_LEN) {
+            if (len < NAME_MAX_LEN) 
+            {
                 strcpy(ptr->module, module->valuestring);
             }
-            else {
+            else 
+            {
                 strncpy(ptr->module, module->valuestring, NAME_MAX_LEN - 1);
                 ptr->module[NAME_MAX_LEN - 1] = '\0';
             }
         }
 
-        // Parse base - Fix format specifier
-        if (cJSON_IsString(base) && base->valuestring) {
-            unsigned int base_val;
-            if (sscanf(base->valuestring, "%x", &base_val) == 1) {  // Use %x, not %lx
-                ptr->base = base_val;
+        // Parse base address
+        if (cJSON_IsString(base) && base->valuestring) 
+        {
+            unsigned long base_val;
+            if (sscanf(base->valuestring, "%lx", &base_val) == 1) 
+            {
+                ptr->base = (uintptr_t)base_val;
+            }
+            else 
+            {
+                printf("ERROR: Failed to parse base address\n");
             }
         }
 
         // Parse offsets
-        if (cJSON_IsArray(offsets)) {
+        if (cJSON_IsArray(offsets)) 
+        {
+            int array_size = cJSON_GetArraySize(offsets);
+
             int offset_idx = 0;
             cJSON* off_item = NULL;
-            cJSON_ArrayForEach(off_item, offsets) {
-                if (offset_idx >= MAX_OFFSETS) break;
-                if (cJSON_IsString(off_item) && off_item->valuestring) {
-                    unsigned int val;
-                    if (sscanf(off_item->valuestring, "%x", &val) == 1) {
-                        ptr->offsets[offset_idx++] = (uint16_t)val;
+            cJSON_ArrayForEach(off_item, offsets) 
+            {
+                if (offset_idx >= MAX_OFFSETS) 
+                {
+                    printf("WARNING: Too many offsets, truncating\n");
+                    break;
+                }
+                if (cJSON_IsString(off_item) && off_item->valuestring) 
+                {
+                    unsigned long val;
+                    if (sscanf(off_item->valuestring, "%lx", &val) == 1) 
+                    {
+                        ptr->offsets[offset_idx] = (uint16_t)val;
+                        offset_idx++;
+                    }
+                    else 
+                    {
+                        printf("ERROR: Failed to parse offset[%d]\n", offset_idx);
                     }
                 }
             }
@@ -119,6 +197,7 @@ int ptr_load(const char* filename, pointer_t* out, int max_pointers)
     }
 
     cJSON_Delete(root);
+    free(data);
     return count;
 }
 
