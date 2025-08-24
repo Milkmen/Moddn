@@ -1,24 +1,6 @@
 ﻿{
   "configurations": [
     {
-      "name": "x64-Debug",
-      "generator": "Ninja",
-      "configurationType": "Debug",
-      "inheritEnvironments": [ "msvc_x64_x64" ],
-      "buildRoot": "${projectDir}\\out\\build\\${name}",
-      "installRoot": "${projectDir}\\out\\install\\${name}",
-      "cmakeCommandArgs": "",
-      "buildCommandArgs": "",
-      "ctestCommandArgs": "",
-      "variables": [
-        {
-          "name": "LUAJIT_LIBRARY",
-          "value": "S:/Moddn/lib/luajit/src/luajit-static.lib",
-          "type": "FILEPATH"
-        }
-      ]
-    },
-    {
       "name": "x86-Debug",
       "generator": "Ninja",
       "configurationType": "Debug",
@@ -33,6 +15,46 @@
           "name": "LUAJIT_LIBRARY",
           "value": "${projectDir}\\lib\\luajit\\src\\luajit-static.lib",
           "type": "FILEPATH"
+        },
+        {
+          "name": "SUBHOOK_INSTALL",
+          "value": "False",
+          "type": "BOOL"
+        },
+        {
+          "name": "CJSON_BUILD_SHARED_LIBS",
+          "value": "False",
+          "type": "BOOL"
+        },
+        {
+          "name": "BUILD_SHARED_AND_STATIC_LIBS",
+          "value": "False",
+          "type": "BOOL"
+        },
+        {
+          "name": "SUBHOOK_FORCE_32BIT",
+          "value": "True",
+          "type": "BOOL"
+        },
+        {
+          "name": "SUBHOOK_TESTS",
+          "value": "False",
+          "type": "BOOL"
+        },
+        {
+          "name": "ENABLE_LOCALES",
+          "value": "True",
+          "type": "BOOL"
+        },
+        {
+          "name": "BUILD_TESTING",
+          "value": "False",
+          "type": "BOOL"
+        },
+        {
+          "name": "BUILD_SHARED_LIBS",
+          "value": "False",
+          "type": "BOOL"
         }
       ]
     }
